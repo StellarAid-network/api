@@ -1,0 +1,17 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    uses: StellarAid-network/.github/.github/workflows/lint-node.yml@main
+
+  test:
+    uses: StellarAid-network/.github/.github/workflows/test-node.yml@main
