@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+openapi
+prisma/migrations
+README.md
+CHANGELOG.md

@@ -1,0 +1,236 @@
+// StellarAid API data model.
+//
+// Indexed tables (HelpRequest, Milestone, Contribution, Giveaway, GiveawayClaim,
+// ReputationEvent, Attestation) are written only by the indexer and are read-only for
+// the HTTP layer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Off-chain user profile, keyed by Stellar address.
+model User {
+  address     String   @id
+  displayName String?
+  bio         String?
+  avatarHash  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts    Post[]
+  comments Comment[]
+}
+
+/// A follow relationship between two addresses.
+model Follow {
+  id              String   @id @default(cuid())
+  followerAddress String
+  followeeAddress String
+  createdAt       DateTime @default(now())
+
+  @@unique([followerAddress, followeeAddress])
+  @@index([followeeAddress])
+}
+
+/// An off-chain post.
+model Post {
+  id          String        @id @default(cuid())
+  author      String
+  body        String
+  mediaHashes String[]
+  status      ContentStatus @default(VISIBLE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  authorUser User      @relation(fields: [author], references: [address])
+  comments   Comment[]
+
+  @@index([status, createdAt])
+  @@index([author])
+}
+
+/// A comment on a post.
+model Comment {
+  id        String        @id @default(cuid())
+  postId    String
+  author    String
+  body      String
+  status    ContentStatus @default(VISIBLE)
+  createdAt DateTime      @default(now())
+
+  post       Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorUser User @relation(fields: [author], references: [address])
+
+  @@index([postId, createdAt])
+}
+
+enum ContentStatus {
+  VISIBLE
+  HIDDEN
+  DELETED
+}
+
+/// A report against a post, comment, request, or user.
+model Report {
+  id         String           @id @default(cuid())
+  reporter   String
+  targetType ReportTargetType
+  targetId   String
+  reason     String
+  status     ReportStatus     @default(OPEN)
+  resolvedBy String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+enum ReportTargetType {
+  POST
+  COMMENT
+  REQUEST
+  USER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  ACTIONED
+  DISMISSED
+}
+
+/// Indexed on-chain help request.
+model HelpRequest {
+  id          BigInt   @id
+  creator     String
+  token       String
+  goal        BigInt
+  raised      BigInt   @default(0)
+  deadline    DateTime
+  status      String
+  contentHash String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  milestones    Milestone[]
+  contributions Contribution[]
+
+  @@index([status, deadline])
+  @@index([creator])
+}
+
+/// Indexed on-chain milestone.
+model Milestone {
+  id           String   @id @default(cuid())
+  requestId    BigInt
+  index        Int
+  amount       BigInt
+  status       String
+  evidenceHash String?
+  updatedAt    DateTime @updatedAt
+
+  request HelpRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, index])
+}
+
+/// Indexed on-chain contribution.
+model Contribution {
+  id          String   @id @default(cuid())
+  requestId   BigInt
+  contributor String
+  amount      BigInt
+  txHash      String   @unique
+  ledger      BigInt
+  createdAt   DateTime @default(now())
+
+  request HelpRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([contributor])
+}
+
+/// Indexed on-chain claimable-balance giveaway.
+model Giveaway {
+  id         String   @id @default(cuid())
+  balanceId  String   @unique
+  creator    String
+  asset      String
+  amount     BigInt
+  claimants  String[]
+  predicates Json
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  claims GiveawayClaim[]
+
+  @@index([status])
+  @@index([creator])
+}
+
+/// Indexed on-chain claim of a giveaway.
+model GiveawayClaim {
+  id        String   @id @default(cuid())
+  balanceId String
+  claimer   String
+  txHash    String   @unique
+  ledger    BigInt
+  createdAt DateTime @default(now())
+
+  giveaway Giveaway @relation(fields: [balanceId], references: [balanceId])
+
+  @@index([claimer])
+}
+
+/// Indexed reputation score change.
+model ReputationEvent {
+  id        String   @id @default(cuid())
+  subject   String
+  delta     Int
+  newScore  Int
+  refId     String
+  ledger    BigInt
+  createdAt DateTime @default(now())
+
+  @@index([subject])
+}
+
+/// Indexed attestation.
+model Attestation {
+  id          String    @id @default(cuid())
+  attestor    String
+  subject     String
+  kind        String
+  contentHash String
+  expiresAt   DateTime?
+  revoked     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([subject])
+}
+
+/// Per-stream indexer cursor.
+model IndexerCursor {
+  stream     String   @id
+  lastLedger BigInt   @default(0)
+  lastCursor String?
+  updatedAt  DateTime @updatedAt
+}
+
+/// Idempotency guard for processed events.
+model ProcessedEvent {
+  eventId   String   @id
+  ledger    BigInt
+  createdAt DateTime @default(now())
+
+  @@index([ledger])
+}
