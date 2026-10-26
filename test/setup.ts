@@ -11,7 +11,7 @@ process.env.STELLAR_NETWORK = "testnet";
 process.env.SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org";
 process.env.HORIZON_URL = "https://horizon-testnet.stellar.org";
 
-process.env.SEP10_SIGNING_SECRET = "SDUMMY0000000000000000000000000000000000000000000000000000";
+process.env.SEP10_SIGNING_SECRET = "SCWPFEX7LJITDZN3T3WUJDZZJZAP2U2X75VLHF46NFRHMTMAWJFIYKK5";
 process.env.SEP10_HOME_DOMAIN = "localhost:3000";
 
 process.env.JWT_SECRET = "test-secret";
