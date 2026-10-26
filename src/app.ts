@@ -8,6 +8,10 @@ import { errorHandlerPlugin } from "./plugins/error-handler";
 import { corsPlugin } from "./plugins/cors";
 import { helmetPlugin } from "./plugins/helmet";
 import { swaggerPlugin } from "./plugins/swagger";
+import { authFastifyPlugin } from "./plugins/auth";
+import { rateLimitFPlugin } from "./plugins/rate-limit";
+import { authRoutes } from "./modules/auth/routes";
+import { profileRoutes } from "./modules/profiles/routes";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -26,8 +30,18 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(helmetPlugin);
   await app.register(corsPlugin);
   await app.register(swaggerPlugin);
+  await app.register(rateLimitFPlugin);
+  await app.register(authFastifyPlugin);
 
   await healthRoutes(app);
+
+  await app.register(
+    async (sub) => {
+      await authRoutes(sub);
+      await profileRoutes(sub);
+    },
+    { prefix: "/" },
+  );
 
   app.get("/", { schema: { hide: true } }, async () => ({
     name: "stellaraid-api",
