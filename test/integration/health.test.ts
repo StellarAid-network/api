@@ -56,9 +56,9 @@ suite("GET /readyz (integration)", () => {
     const response = await app!.inject({ method: "GET", url: "/readyz" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
+    expect(response.json()).toMatchObject({
       status: "ready",
-      checks: { database: true, redis: true },
+      checks: { database: true, redis: true, indexer: true },
     });
   });
 });

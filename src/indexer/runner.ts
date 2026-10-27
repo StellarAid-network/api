@@ -7,6 +7,11 @@ import { fetchSorobanEvents } from "./soroban";
 import { fetchHorizonClaimableBalances } from "./horizon";
 import { handleHelpRequestEvent } from "./handlers/help-request";
 import { handleGiveawayRecord } from "./handlers/giveaway";
+import {
+  recordProcessedEvents,
+  updateLatestLedger,
+  updateLastIndexedLedger,
+} from "./metrics";
 import { NETWORK_DEFAULTS, decodeEvent } from "@stellar-aid/sdk";
 
 const SOROBAN_STREAM = "soroban:help_request";
@@ -46,6 +51,7 @@ export async function pollOnce(): Promise<{
         : config.indexerStartLedger || 1;
 
     const result = await fetchSorobanEvents(contractId, startLedger);
+    updateLatestLedger(result.latestLedger);
 
     for (const raw of result.events) {
       await prisma.$transaction(async (tx) => {
@@ -78,6 +84,9 @@ export async function pollOnce(): Promise<{
               "failed to decode or handle Soroban event; recording as processed",
             );
           }
+
+          recordProcessedEvents(1);
+          updateLastIndexedLedger(raw.ledger);
         }
 
         await updateStreamCursor(SOROBAN_STREAM, raw.ledger, raw.id, tx);
@@ -120,6 +129,8 @@ export async function pollOnce(): Promise<{
           });
 
           await handleGiveawayRecord(record, tx);
+          recordProcessedEvents(1);
+          updateLastIndexedLedger(record.last_modified_ledger);
         }
 
         await updateStreamCursor(

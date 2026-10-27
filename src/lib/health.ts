@@ -1,10 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "./db";
 import { redis } from "./redis";
+import {
+  isIndexerLagAcceptable,
+  getIndexerMetrics,
+  formatPrometheusMetrics,
+} from "../indexer/metrics";
 
 interface ReadinessChecks {
   database: boolean;
   redis: boolean;
+  indexer: boolean;
 }
 
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
@@ -42,8 +48,16 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
                 properties: {
                   database: { type: "boolean" },
                   redis: { type: "boolean" },
+                  indexer: { type: "boolean" },
                 },
-                required: ["database", "redis"],
+                required: ["database", "redis", "indexer"],
+              },
+              metrics: {
+                type: "object",
+                properties: {
+                  indexer_lag_ledgers: { type: "number" },
+                  events_processed_total: { type: "number" },
+                },
               },
             },
             required: ["status", "checks"],
@@ -53,7 +67,11 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (_request, reply) => {
-      const checks: ReadinessChecks = { database: false, redis: false };
+      const checks: ReadinessChecks = {
+        database: false,
+        redis: false,
+        indexer: true,
+      };
 
       try {
         await prisma.$queryRaw`SELECT 1`;
@@ -69,9 +87,37 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
         app.log.warn({ err: error }, "readiness: redis check failed");
       }
 
-      const ready = checks.database && checks.redis;
+      // Check indexer lag
+      const indexerOk = isIndexerLagAcceptable();
+      checks.indexer = indexerOk;
+      if (!indexerOk) {
+        app.log.warn(
+          { metrics: getIndexerMetrics() },
+          "readiness: indexer lag exceeds threshold",
+        );
+      }
+
+      const ready = checks.database && checks.redis && checks.indexer;
       reply.code(ready ? 200 : 503);
-      return { status: ready ? "ready" : "not_ready", checks };
+      return {
+        status: ready ? "ready" : "not_ready",
+        checks,
+        metrics: getIndexerMetrics(),
+      };
+    },
+  );
+
+  app.get(
+    "/metrics",
+    {
+      schema: {
+        tags: ["health"],
+        summary: "Prometheus metrics",
+      },
+    },
+    async (_request, reply) => {
+      reply.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+      return formatPrometheusMetrics();
     },
   );
 }
