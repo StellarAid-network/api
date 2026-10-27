@@ -4,3 +4,6 @@ export interface IndexerHandler {
 }
 
 export const handlers: readonly IndexerHandler[] = [];
+
+export { handleHelpRequestEvent } from "./help-request";
+export { handleGiveawayRecord, handleGiveawayClaim } from "./giveaway";
