@@ -50,3 +50,13 @@ export function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+/**
+ * Validates that an account meets the minimum age requirement before creating social content.
+ */
+export function isAccountOldEnough(createdAt: Date | undefined | null, minAgeSeconds: number): boolean {
+  if (minAgeSeconds <= 0) return true;
+  if (!createdAt) return false;
+  const ageSeconds = (Date.now() - createdAt.getTime()) / 1000;
+  return ageSeconds >= minAgeSeconds;
+}

@@ -60,3 +60,19 @@ export const authRateLimit = {
     },
   },
 };
+
+/** Stricter rate limit for creating posts and comments (spam protection). */
+export const socialWriteRateLimit = {
+  config: {
+    rateLimit: {
+      max: 20,
+      timeWindow: "1 minute",
+      keyGenerator: (request: unknown) => {
+        const user = (request as { user?: { address?: string } }).user;
+        return user?.address
+          ? `rl:social:${user.address}`
+          : `rl:social:${(request as { ip: string }).ip}`;
+      },
+    },
+  },
+};

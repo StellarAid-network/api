@@ -41,6 +41,7 @@ const EnvSchema = z.object({
   IPFS_PINNING_JWT: optionalString,
   SENTRY_DSN: optionalString,
   ADMIN_ADDRESSES: optionalString,
+  MIN_ACCOUNT_AGE_SECONDS: z.coerce.number().int().nonnegative().default(0),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -65,6 +66,7 @@ export interface AppConfig {
   ipfsPinningJwt: string | undefined;
   sentryDsn: string | undefined;
   adminAddresses: string[];
+  minAccountAgeSeconds: number;
 }
 
 export class ConfigError extends Error {
@@ -112,6 +114,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     ipfsPinningJwt: env.IPFS_PINNING_JWT,
     sentryDsn: env.SENTRY_DSN,
     adminAddresses: splitList(env.ADMIN_ADDRESSES),
+    minAccountAgeSeconds: env.MIN_ACCOUNT_AGE_SECONDS,
   };
 }
 

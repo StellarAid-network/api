@@ -9,7 +9,9 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../../lib/db";
 import { requireAuth } from "../../plugins/auth";
-import { CommentBodySchema } from "../../lib/content";
+import { CommentBodySchema, isAccountOldEnough } from "../../lib/content";
+import { socialWriteRateLimit } from "../../plugins/rate-limit";
+import { config } from "../../config";
 
 const CreateCommentSchema = z.object({
   body: CommentBodySchema,
@@ -139,6 +141,7 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/posts/:id/comments",
     {
+      ...socialWriteRateLimit,
       schema: {
         tags: ["social"],
         summary: "Add a comment to a post",
@@ -168,6 +171,7 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
           },
           400: { type: "object", additionalProperties: true },
           401: { type: "object", additionalProperties: true },
+          403: { type: "object", additionalProperties: true },
           404: { type: "object", additionalProperties: true },
         },
       },
@@ -175,6 +179,16 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       requireAuth(request, reply);
       const user = request.user;
+
+      const existingUser = await prisma.user.findUnique({ where: { address: user.address } });
+      if (existingUser && !isAccountOldEnough(existingUser.createdAt, config.minAccountAgeSeconds)) {
+        return reply.code(403).send({
+          type: "https://stellaraid.app/errors/forbidden",
+          title: "Forbidden",
+          status: 403,
+          detail: "Account is too new to comment",
+        });
+      }
 
       const { id: postId } = request.params as { id: string };
 

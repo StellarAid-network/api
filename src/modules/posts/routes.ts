@@ -10,7 +10,9 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../../lib/db";
 import { requireAuth } from "../../plugins/auth";
-import { PostBodySchema, MediaHashesSchema } from "../../lib/content";
+import { PostBodySchema, MediaHashesSchema, isAccountOldEnough } from "../../lib/content";
+import { socialWriteRateLimit } from "../../plugins/rate-limit";
+import { config } from "../../config";
 
 const CreatePostSchema = z.object({
   body: PostBodySchema,
@@ -22,6 +24,7 @@ export async function postRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/posts",
     {
+      ...socialWriteRateLimit,
       schema: {
         tags: ["social"],
         summary: "Create a new post",
@@ -53,12 +56,23 @@ export async function postRoutes(app: FastifyInstance): Promise<void> {
           },
           400: { type: "object", additionalProperties: true },
           401: { type: "object", additionalProperties: true },
+          403: { type: "object", additionalProperties: true },
         },
       },
     },
     async (request, reply) => {
       requireAuth(request, reply);
       const user = request.user;
+
+      const existingUser = await prisma.user.findUnique({ where: { address: user.address } });
+      if (existingUser && !isAccountOldEnough(existingUser.createdAt, config.minAccountAgeSeconds)) {
+        return reply.code(403).send({
+          type: "https://stellaraid.app/errors/forbidden",
+          title: "Forbidden",
+          status: 403,
+          detail: "Account is too new to post",
+        });
+      }
 
       const parsed = CreatePostSchema.safeParse(request.body);
       if (!parsed.success) {
