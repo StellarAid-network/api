@@ -12,3 +12,7 @@ export const prisma =
 if (config.nodeEnv !== "production") {
   globalForPrisma.prisma = prisma;
 }
+
+export async function disconnect(): Promise<void> {
+  await prisma.$disconnect();
+}
