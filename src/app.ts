@@ -13,6 +13,7 @@ import { rateLimitFPlugin } from "./plugins/rate-limit";
 import { authRoutes } from "./modules/auth/routes";
 import { profileRoutes } from "./modules/profiles/routes";
 import { postRoutes } from "./modules/posts/routes";
+import { commentRoutes } from "./modules/comments/routes";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -41,6 +42,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await authRoutes(sub);
       await profileRoutes(sub);
       await postRoutes(sub);
+      await commentRoutes(sub);
     },
     { prefix: "/" },
   );
