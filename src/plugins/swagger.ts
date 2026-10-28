@@ -16,6 +16,15 @@ export const swaggerPlugin = fp(
           version: "0.1.0",
         },
         servers: [{ url: `http://localhost:${config.port}` }],
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "JWT",
+            },
+          },
+        },
         tags: [{ name: "health", description: "Liveness and readiness probes" }],
       },
     });

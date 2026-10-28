@@ -105,6 +105,23 @@ enum ReportStatus {
   DISMISSED
 }
 
+/// Audit log for moderator actions on reports and content.
+model ModerationAuditLog {
+  id             String           @id @default(cuid())
+  reportId       String
+  moderator      String
+  action         String
+  targetType     ReportTargetType
+  targetId       String
+  previousStatus ReportStatus
+  newStatus      ReportStatus
+  note           String?
+  createdAt      DateTime         @default(now())
+
+  @@index([reportId])
+  @@index([moderator, createdAt])
+}
+
 /// Indexed on-chain help request.
 model HelpRequest {
   id          BigInt   @id
