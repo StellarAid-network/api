@@ -15,6 +15,8 @@ import { profileRoutes } from "./modules/profiles/routes";
 import { postRoutes } from "./modules/posts/routes";
 import { commentRoutes } from "./modules/comments/routes";
 import { feedRoutes } from "./modules/feed/routes";
+import { requestRoutes } from "./modules/requests/routes";
+import { giveawayRoutes } from "./modules/giveaways/routes";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -45,6 +47,8 @@ export async function buildApp(): Promise<FastifyInstance> {
       await postRoutes(sub);
       await commentRoutes(sub);
       await feedRoutes(sub);
+      await requestRoutes(sub);
+      await giveawayRoutes(sub);
     },
     { prefix: "/" },
   );
