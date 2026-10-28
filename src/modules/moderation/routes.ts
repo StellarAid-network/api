@@ -242,13 +242,14 @@ export async function moderationRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const { status: nextStatus, hideContent, note } = parsed.data;
-      const allowed = ALLOWED_TRANSITIONS[existing.status];
+      const previousStatus = existing.status;
+      const allowed = ALLOWED_TRANSITIONS[previousStatus];
       if (!allowed || !allowed.has(nextStatus)) {
         return reply.code(409).send({
           type: "https://stellaraid.app/errors/conflict",
           title: "Invalid Status Transition",
           status: 409,
-          detail: `Cannot transition report from ${existing.status} to ${nextStatus}`,
+          detail: `Cannot transition report from ${previousStatus} to ${nextStatus}`,
         });
       }
 
@@ -313,7 +314,7 @@ export async function moderationRoutes(app: FastifyInstance): Promise<void> {
             action: actionLabel,
             targetType: existing.targetType,
             targetId: existing.targetId,
-            previousStatus: existing.status,
+            previousStatus,
             newStatus: nextStatus,
             note: note ?? null,
           },

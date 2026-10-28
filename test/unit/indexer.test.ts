@@ -19,9 +19,9 @@ describe("Indexer Event Handlers & Replay Safety", () => {
   it("replays recorded help_request event stream idempotently into DB state", async () => {
     // In-memory mock database state
     const db = {
-      helpRequests: new Map<string, any>(),
-      contributions: new Map<string, any>(),
-      milestones: new Map<string, any>(),
+      helpRequests: new Map<string, Record<string, unknown>>(),
+      contributions: new Map<string, Record<string, unknown>>(),
+      milestones: new Map<string, Record<string, unknown>>(),
     };
 
     const mockTx: Partial<Prisma.TransactionClient> = {
@@ -44,7 +44,7 @@ describe("Indexer Event Handlers & Replay Safety", () => {
           }
           return Promise.resolve({ count: 1 });
         }),
-      } as any,
+      } as unknown as Prisma.TransactionClient["helpRequest"],
       contribution: {
         upsert: vi.fn().mockImplementation(({ where, update, create }) => {
           const txHash = where.txHash;
@@ -56,7 +56,7 @@ describe("Indexer Event Handlers & Replay Safety", () => {
           }
           return Promise.resolve(db.contributions.get(txHash));
         }),
-      } as any,
+      } as unknown as Prisma.TransactionClient["contribution"],
       milestone: {
         upsert: vi.fn().mockImplementation(({ where, update, create }) => {
           const key = `${where.requestId_index.requestId}_${where.requestId_index.index}`;
@@ -76,7 +76,7 @@ describe("Indexer Event Handlers & Replay Safety", () => {
           }
           return Promise.resolve({ count: 1 });
         }),
-      } as any,
+      } as unknown as Prisma.TransactionClient["milestone"],
     };
 
     // Recorded fixture stream representing a request lifecycle:
@@ -192,8 +192,8 @@ describe("Indexer Event Handlers & Replay Safety", () => {
   });
 
   it("handles Horizon giveaway claimable balances and claims idempotently", async () => {
-    const giveaways = new Map<string, any>();
-    const claims = new Map<string, any>();
+    const giveaways = new Map<string, Record<string, unknown>>();
+    const claims = new Map<string, Record<string, unknown>>();
 
     const mockTx: Partial<Prisma.TransactionClient> = {
       giveaway: {
@@ -213,7 +213,7 @@ describe("Indexer Event Handlers & Replay Safety", () => {
           }
           return Promise.resolve({ count: 1 });
         }),
-      } as any,
+      } as unknown as Prisma.TransactionClient["giveaway"],
       giveawayClaim: {
         upsert: vi.fn().mockImplementation(({ where, update, create }) => {
           const txHash = where.txHash;
@@ -224,7 +224,7 @@ describe("Indexer Event Handlers & Replay Safety", () => {
           }
           return Promise.resolve(claims.get(txHash));
         }),
-      } as any,
+      } as unknown as Prisma.TransactionClient["giveawayClaim"],
     };
 
     const record = {
@@ -267,6 +267,6 @@ describe("Indexer Event Handlers & Replay Safety", () => {
       txHash: "claim_tx_999",
       ledger: 505n,
     });
-    expect(giveaways.get("00000000abc123").status).toBe("claimed");
+    expect(giveaways.get("00000000abc123")?.status).toBe("claimed");
   });
 });
