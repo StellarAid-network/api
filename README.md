@@ -114,16 +114,16 @@ They share code and the database but scale independently. If the indexer needs i
 ## Getting started
 
 ```bash
-git clone https://github.com/stellar-aid/api.git
+git clone https://github.com/StellarAid-network/api.git
 cd api
 pnpm install
 
 cp .env.example .env
 # edit .env (see below)
 
-docker compose up -d db redis        # Postgres + Redis
+docker compose up -d db redis        # Postgres + Redis (or `docker compose up --build -d` for db + redis + api + indexer)
 pnpm prisma migrate dev              # apply migrations
-pnpm prisma db seed                  # optional: sample data
+pnpm prisma db seed                  # optional: testnet-shaped demo data
 
 pnpm dev                             # server with hot reload
 pnpm dev:indexer                     # indexer with hot reload (separate terminal)
@@ -166,6 +166,8 @@ stellar keys secret sep10-server   # put in SEP10_SIGNING_SECRET (never commit)
 | `SENTRY_DSN` | ➖ | Error reporting |
 | `LOG_LEVEL` | ➖ | `info` by default |
 | `ADMIN_ADDRESSES` | ➖ | Comma-separated Stellar addresses with admin and moderator rights |
+| `MIN_ACCOUNT_AGE_SECONDS` | ➖ | Minimum local profile age required before posting/commenting (default `0`) |
+| `METRICS_INTERNAL_TOKEN` | ➖ | Optional shared `X-Internal-Token` header allowing Prometheus scrapes of `/metrics` |
 
 Secrets must come from your platform's secret manager, never from committed files.
 
@@ -283,6 +285,13 @@ Rules:
 | GET | `/reputation/:address` | none | Score and badges |
 | GET | `/attestations/:subject` | none | Attestations for a user or request |
 
+### Notifications
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/notifications` | JWT | List own in-app notifications (`?unreadOnly=`) |
+| POST | `/notifications/:id/read` | JWT (owner) | Mark own notification as read |
+
 ### Search and utility
 
 | Method | Path | Description |
@@ -291,6 +300,7 @@ Rules:
 | POST | `/uploads` | Upload media (JWT), returns an IPFS hash |
 | GET | `/healthz` | Liveness |
 | GET | `/readyz` | Readiness (DB, Redis, RPC reachability, indexer lag) |
+| GET | `/metrics` | Prometheus metrics (internal IP or `X-Internal-Token` only) |
 
 **Conventions:** JSON, cursor-based pagination (`?cursor=&limit=`), RFC 7807-style error bodies, `X-Request-Id` on every response.
 
@@ -307,13 +317,15 @@ Core tables (Prisma models). See `prisma/schema.prisma` for the full schema.
 | `Post` | id, author, body, mediaHashes[], status, createdAt | off-chain |
 | `Comment` | id, postId, author, body, status | off-chain |
 | `Report` | id, reporter, targetType, targetId, reason, status, resolvedBy | off-chain |
+| `ModerationAuditLog` | id, reportId, moderator, action, targetType, targetId, previousStatus, newStatus | off-chain |
 | `HelpRequest` | id (on-chain id), creator, token, goal, raised, deadline, status, contentHash, metadata | **indexed** |
 | `Milestone` | requestId, index, amount, status, evidenceHash | **indexed** |
 | `Contribution` | requestId, contributor, amount, txHash, ledger, createdAt | **indexed** |
 | `Giveaway` | balanceId, creator, asset, amount, claimants, predicates, status | **indexed** |
-| `GiveawayClaim` | balanceId, claimer, txHash | **indexed** |
+| `GiveawayClaim` | balanceId, claimer, txHash, ledger | **indexed** |
 | `ReputationEvent` | subject, delta, newScore, refId, ledger | **indexed** |
 | `Attestation` | id, attestor, subject, kind, contentHash, expiresAt, revoked | **indexed** |
+| `Notification` | id, recipient, kind, title, body, refId, read, createdAt | off-chain (BullMQ) |
 | `IndexerCursor` | stream, lastLedger, lastCursor, updatedAt | system |
 | `ProcessedEvent` | eventId (unique), ledger | system (idempotency) |
 
@@ -411,10 +423,18 @@ Rules:
 
 ## Running in production
 
+Build from the workspace root so the local `@stellar-aid/sdk` dependency is bundled cleanly:
+
 ```bash
-docker build -t stellar-aid-api .
+docker build -f api/Dockerfile -t stellar-aid-api ..
 docker run --env-file .env -p 4000:4000 stellar-aid-api pnpm start:server
 docker run --env-file .env stellar-aid-api pnpm start:indexer
+```
+
+Or launch Postgres, Redis, API server, and indexer together via Docker Compose:
+
+```bash
+docker compose up --build -d
 ```
 
 Deployment checklist:
@@ -468,7 +488,9 @@ pnpm test:coverage
 | `pnpm start:server` / `pnpm start:indexer` | Run compiled processes |
 | `pnpm lint` / `pnpm typecheck` / `pnpm format` | Quality checks |
 | `pnpm test` / `pnpm test:integration` | Tests |
+| `pnpm loadtest` | HTTP latency & 1,000-event indexer replay benchmark (see [docs/performance.md](./docs/performance.md)) |
 | `pnpm openapi:export` | Write `openapi/openapi.json` |
+| `pnpm prisma db seed` | Seed realistic testnet-shaped demo data |
 | `pnpm prisma ...` | Prisma commands |
 
 ---
@@ -476,24 +498,24 @@ pnpm test:coverage
 ## Security
 
 - All inputs validated with zod and Fastify JSON schemas. Parameterized queries only (Prisma).
-- Authentication through SEP-10 and short-lived JWTs. Authorization is always derived from the token, never from request bodies.
+- Authentication through SEP-10 and short-lived JWTs. Authorization is always derived from the token, never from request bodies (see [docs/authz-matrix.md](./docs/authz-matrix.md)).
 - Strict CORS, security headers (`@fastify/helmet`), and request size limits.
 - User content is stored raw and **escaped or sanitized on output**. Uploads are type-checked.
 - Secrets never logged. PII minimized. Only wallet addresses and user-provided profile data are stored.
 - Dependencies are monitored (Dependabot or Renovate, `pnpm audit` in CI).
-- Report vulnerabilities privately. See [SECURITY.md](https://github.com/stellar-aid/.github/blob/main/SECURITY.md).
+- Report vulnerabilities privately. See [SECURITY.md](https://github.com/StellarAid-network/.github/blob/main/SECURITY.md).
 
 ---
 
 ## Contributing
 
-1. Open or claim an issue. API changes that affect `web` should mention the needed client changes.
+1. Open or claim an issue from [docs/backlog.md](./docs/backlog.md). API changes that affect `web` should mention the needed client changes.
 2. Branch from `main`. Add or update tests and migrations.
-3. Run `pnpm lint typecheck test` and, for DB changes, `pnpm test:integration`.
-4. Regenerate and commit the OpenAPI spec if routes changed.
+3. Run `pnpm lint && pnpm typecheck && pnpm test` and, for DB changes, `pnpm test:integration`.
+4. Regenerate and commit the OpenAPI spec (`pnpm openapi:export`) if routes changed.
 5. Follow Conventional Commits and the PR template.
 
-See the org [Contributing guide](https://github.com/stellar-aid/.github/blob/main/CONTRIBUTING.md).
+See [docs/CONTRIBUTING-api.md](./docs/CONTRIBUTING-api.md) and the org [Contributing guide](https://github.com/StellarAid-network/.github/blob/main/CONTRIBUTING.md).
 
 ---
 

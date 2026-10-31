@@ -25,6 +25,7 @@
     "test:integration": "vitest run --dir test/integration",
     "test:coverage": "vitest run --coverage",
     "openapi:export": "tsx scripts/openapi-export.ts",
+    "loadtest": "tsx scripts/load-test.ts",
     "prisma": "prisma",
     "postinstall": "prisma generate"
   },

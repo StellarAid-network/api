@@ -32,10 +32,14 @@ services:
 
   api:
     build:
-      context: .
-    profiles: ["app"]
+      context: ..
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://stellaraid:stellaraid@db:5432/stellaraid?schema=public
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy
@@ -43,7 +47,31 @@ services:
         condition: service_healthy
     ports:
       - "4000:4000"
-    command: ["node", "dist/server.js"]
+    command: ["sh", "-c", "pnpm prisma migrate deploy && node dist/server.js"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  indexer:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://stellaraid:stellaraid@db:5432/stellaraid?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    command: ["node", "dist/indexer.js"]
 
 volumes:
   db-data:
