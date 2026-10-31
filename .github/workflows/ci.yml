@@ -2,7 +2,6 @@ name: ci
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 concurrency:
@@ -11,13 +10,10 @@ concurrency:
 
 jobs:
   lint:
-    uses: StellarAid-network/.github/.github/workflows/lint-node.yml@main
-
-  test:
-    uses: StellarAid-network/.github/.github/workflows/test-node.yml@main
-
-  openapi-drift:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,11 +21,76 @@ jobs:
       - name: Checkout @stellar-aid/sdk
         uses: actions/checkout@v4
         with:
-          repository: stellar-aid/sdk
+          repository: StellarAid-network/sdk
           path: sdk
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: api/pnpm-lock.yaml
+      - name: Install dependencies and lint
+        run: |
+          if [ -f ../sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" ../sdk/pnpm-workspace.yaml; then
+            sed -i '1s/^/packages:\n  - \".\"\n/' ../sdk/pnpm-workspace.yaml
+          fi
+          pnpm --dir ../sdk install --frozen-lockfile
+          pnpm --dir ../sdk build
+          pnpm install --frozen-lockfile
+          pnpm run lint
+          pnpm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: api
+      - name: Checkout @stellar-aid/sdk
+        uses: actions/checkout@v4
+        with:
+          repository: StellarAid-network/sdk
+          path: sdk
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: api/pnpm-lock.yaml
+      - name: Install dependencies and test
+        run: |
+          if [ -f ../sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" ../sdk/pnpm-workspace.yaml; then
+            sed -i '1s/^/packages:\n  - \".\"\n/' ../sdk/pnpm-workspace.yaml
+          fi
+          pnpm --dir ../sdk install --frozen-lockfile
+          pnpm --dir ../sdk build
+          pnpm install --frozen-lockfile
+          pnpm test
+
+  openapi-drift:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: api
+      - name: Checkout @stellar-aid/sdk
+        uses: actions/checkout@v4
+        with:
+          repository: StellarAid-network/sdk
+          path: sdk
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -37,8 +98,11 @@ jobs:
           cache-dependency-path: api/pnpm-lock.yaml
       - name: Build SDK and verify committed OpenAPI spec is up to date
         run: |
-          pnpm --dir sdk install --frozen-lockfile
-          pnpm --dir sdk build
-          pnpm --dir api install --frozen-lockfile
-          pnpm --dir api openapi:export
-          git -C api diff --exit-code openapi/openapi.json
+          if [ -f ../sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" ../sdk/pnpm-workspace.yaml; then
+            sed -i '1s/^/packages:\n  - \".\"\n/' ../sdk/pnpm-workspace.yaml
+          fi
+          pnpm --dir ../sdk install --frozen-lockfile
+          pnpm --dir ../sdk build
+          pnpm install --frozen-lockfile
+          pnpm openapi:export
+          git diff --exit-code openapi/openapi.json
