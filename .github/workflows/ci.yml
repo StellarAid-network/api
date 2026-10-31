@@ -11,6 +11,9 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,17 +33,20 @@ jobs:
           cache-dependency-path: api/pnpm-lock.yaml
       - name: Install dependencies and lint
         run: |
-          if [ -f sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" sdk/pnpm-workspace.yaml; then
-            sed -i '1s/^/packages:\n  - \".\"\n/' sdk/pnpm-workspace.yaml
+          if [ -f ../sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" ../sdk/pnpm-workspace.yaml; then
+            sed -i '1s/^/packages:\n  - \".\"\n/' ../sdk/pnpm-workspace.yaml
           fi
-          pnpm --dir sdk install --frozen-lockfile
-          pnpm --dir sdk build
-          pnpm --dir api install --frozen-lockfile
-          pnpm --dir api run lint
-          pnpm --dir api run typecheck
+          pnpm --dir ../sdk install --frozen-lockfile
+          pnpm --dir ../sdk build
+          pnpm install --frozen-lockfile
+          pnpm run lint
+          pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,16 +66,19 @@ jobs:
           cache-dependency-path: api/pnpm-lock.yaml
       - name: Install dependencies and test
         run: |
-          if [ -f sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" sdk/pnpm-workspace.yaml; then
-            sed -i '1s/^/packages:\n  - \".\"\n/' sdk/pnpm-workspace.yaml
+          if [ -f ../sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" ../sdk/pnpm-workspace.yaml; then
+            sed -i '1s/^/packages:\n  - \".\"\n/' ../sdk/pnpm-workspace.yaml
           fi
-          pnpm --dir sdk install --frozen-lockfile
-          pnpm --dir sdk build
-          pnpm --dir api install --frozen-lockfile
-          pnpm --dir api test
+          pnpm --dir ../sdk install --frozen-lockfile
+          pnpm --dir ../sdk build
+          pnpm install --frozen-lockfile
+          pnpm test
 
   openapi-drift:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,11 +98,11 @@ jobs:
           cache-dependency-path: api/pnpm-lock.yaml
       - name: Build SDK and verify committed OpenAPI spec is up to date
         run: |
-          if [ -f sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" sdk/pnpm-workspace.yaml; then
-            sed -i '1s/^/packages:\n  - \".\"\n/' sdk/pnpm-workspace.yaml
+          if [ -f ../sdk/pnpm-workspace.yaml ] && ! grep -q "packages:" ../sdk/pnpm-workspace.yaml; then
+            sed -i '1s/^/packages:\n  - \".\"\n/' ../sdk/pnpm-workspace.yaml
           fi
-          pnpm --dir sdk install --frozen-lockfile
-          pnpm --dir sdk build
-          pnpm --dir api install --frozen-lockfile
-          pnpm --dir api openapi:export
-          git -C api diff --exit-code openapi/openapi.json
+          pnpm --dir ../sdk install --frozen-lockfile
+          pnpm --dir ../sdk build
+          pnpm install --frozen-lockfile
+          pnpm openapi:export
+          git diff --exit-code openapi/openapi.json
