@@ -15,12 +15,7 @@ import { config } from "../../config";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MiB
 
-const ALLOWED_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 const UploadBodySchema = z.object({
   filename: z.string().trim().min(1).max(255).optional().default("upload.bin"),

@@ -121,9 +121,7 @@ function sanitizeRequestMetadata(
 
   const title = typeof meta.title === "string" ? meta.title : "";
   const description = typeof meta.description === "string" ? meta.description : "";
-  const mediaHashes = Array.isArray(meta.mediaHashes)
-    ? (meta.mediaHashes as string[])
-    : [];
+  const mediaHashes = Array.isArray(meta.mediaHashes) ? (meta.mediaHashes as string[]) : [];
   const tags = Array.isArray(meta.tags) ? (meta.tags as string[]) : [];
   const cid = typeof meta.cid === "string" ? meta.cid : undefined;
 
@@ -283,7 +281,8 @@ export async function requestRoutes(app: FastifyInstance): Promise<void> {
           const tags = Array.isArray(meta.tags)
             ? (meta.tags as string[]).map((t) => String(t).toLowerCase().replace(/^#/, ""))
             : [];
-          const text = `${String(meta.title ?? "")} ${String(meta.description ?? "")}`.toLowerCase();
+          const text =
+            `${String(meta.title ?? "")} ${String(meta.description ?? "")}`.toLowerCase();
           if (!tags.includes(normalizedTag) && !text.includes(normalizedTag)) {
             return false;
           }
@@ -586,7 +585,8 @@ export async function requestRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ["requests"],
-        summary: "Attach off-chain description and media referenced by on-chain hash (creator only)",
+        summary:
+          "Attach off-chain description and media referenced by on-chain hash (creator only)",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",

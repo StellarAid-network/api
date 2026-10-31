@@ -3,8 +3,30 @@
  */
 
 import type { Prisma } from "@prisma/client";
-import type { StellarAidEvent } from "@stellar-aid/sdk";
+import { formatAmount, type StellarAidEvent } from "@stellar-aid/sdk";
 import { logger } from "../../lib/logger";
+import { enqueueNotification } from "../../jobs/notifications";
+
+async function findRequestCreator(
+  tx: Prisma.TransactionClient,
+  requestId: bigint,
+): Promise<string | null> {
+  const finder = (
+    tx.helpRequest as unknown as {
+      findUnique?: (args: {
+        where: { id: bigint };
+        select?: { creator: boolean };
+      }) => Promise<{ creator?: string } | null>;
+    }
+  )?.findUnique;
+  if (!finder) return null;
+  try {
+    const row = await finder({ where: { id: requestId }, select: { creator: true } });
+    return row?.creator ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function handleHelpRequestEvent(
   event: StellarAidEvent,
@@ -60,7 +82,20 @@ export async function handleHelpRequestEvent(
           ledger: BigInt(ledger),
         },
       });
-      logger.info({ requestId: event.requestId.toString(), contributor: event.contributor }, "indexed help_request.contributed");
+      const creator = await findRequestCreator(tx, event.requestId);
+      if (creator && creator !== event.contributor) {
+        await enqueueNotification({
+          recipient: creator,
+          kind: "contribution_received",
+          title: "New contribution received",
+          body: `${event.contributor.slice(0, 6)}... contributed ${formatAmount(event.amount)} to request #${event.requestId.toString()}.`,
+          refId: event.requestId.toString(),
+        });
+      }
+      logger.info(
+        { requestId: event.requestId.toString(), contributor: event.contributor },
+        "indexed help_request.contributed",
+      );
       break;
     }
 
@@ -72,6 +107,16 @@ export async function handleHelpRequestEvent(
           raised: event.totalRaised,
         },
       });
+      const creator = await findRequestCreator(tx, event.requestId);
+      if (creator) {
+        await enqueueNotification({
+          recipient: creator,
+          kind: "goal_reached",
+          title: "Funding goal reached",
+          body: `Help request #${event.requestId.toString()} reached its goal (${formatAmount(event.totalRaised)} raised).`,
+          refId: event.requestId.toString(),
+        });
+      }
       logger.info({ requestId: event.requestId.toString() }, "indexed help_request.funded");
       break;
     }
@@ -84,6 +129,16 @@ export async function handleHelpRequestEvent(
           raised: event.totalRaised,
         },
       });
+      const creator = await findRequestCreator(tx, event.requestId);
+      if (creator) {
+        await enqueueNotification({
+          recipient: creator,
+          kind: "goal_failed",
+          title: "Funding deadline ended below goal",
+          body: `Help request #${event.requestId.toString()} closed below goal; contributors can now claim full refunds.`,
+          refId: event.requestId.toString(),
+        });
+      }
       logger.info({ requestId: event.requestId.toString() }, "indexed help_request.failed");
       break;
     }
@@ -98,7 +153,14 @@ export async function handleHelpRequestEvent(
     }
 
     case "help_request.refunded": {
-      logger.info({ requestId: event.requestId.toString(), contributor: event.contributor, amount: event.amount.toString() }, "indexed help_request.refunded");
+      logger.info(
+        {
+          requestId: event.requestId.toString(),
+          contributor: event.contributor,
+          amount: event.amount.toString(),
+        },
+        "indexed help_request.refunded",
+      );
       break;
     }
 
@@ -122,7 +184,10 @@ export async function handleHelpRequestEvent(
           evidenceHash: event.evidenceHash,
         },
       });
-      logger.info({ requestId: event.requestId.toString(), index: event.index }, "indexed help_request.milestone_submitted");
+      logger.info(
+        { requestId: event.requestId.toString(), index: event.index },
+        "indexed help_request.milestone_submitted",
+      );
       break;
     }
 
@@ -136,7 +201,20 @@ export async function handleHelpRequestEvent(
           status: "approved",
         },
       });
-      logger.info({ requestId: event.requestId.toString(), index: event.index, approver: event.approver }, "indexed help_request.milestone_approved");
+      const creator = await findRequestCreator(tx, event.requestId);
+      if (creator) {
+        await enqueueNotification({
+          recipient: creator,
+          kind: "milestone_approved",
+          title: `Milestone #${event.index + 1} approved`,
+          body: `Milestone #${event.index + 1} on help request #${event.requestId.toString()} was approved and is ready to release.`,
+          refId: `${event.requestId.toString()}:${event.index}`,
+        });
+      }
+      logger.info(
+        { requestId: event.requestId.toString(), index: event.index, approver: event.approver },
+        "indexed help_request.milestone_approved",
+      );
       break;
     }
 
@@ -155,7 +233,14 @@ export async function handleHelpRequestEvent(
         where: { id: event.requestId },
         data: { status: "releasing" },
       });
-      logger.info({ requestId: event.requestId.toString(), index: event.index, amount: event.amount.toString() }, "indexed help_request.milestone_released");
+      logger.info(
+        {
+          requestId: event.requestId.toString(),
+          index: event.index,
+          amount: event.amount.toString(),
+        },
+        "indexed help_request.milestone_released",
+      );
       break;
     }
 

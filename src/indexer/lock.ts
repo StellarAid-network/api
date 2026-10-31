@@ -10,7 +10,9 @@ export const INDEXER_ADVISORY_LOCK_ID = 884_209_111;
 /**
  * Attempts to acquire the exclusive advisory lock. Returns true if acquired.
  */
-export async function tryAcquireIndexerLock(lockId: number = INDEXER_ADVISORY_LOCK_ID): Promise<boolean> {
+export async function tryAcquireIndexerLock(
+  lockId: number = INDEXER_ADVISORY_LOCK_ID,
+): Promise<boolean> {
   try {
     const result = await prisma.$queryRaw<[{ locked: boolean }]>`
       SELECT pg_try_advisory_lock(${lockId}) as locked;
@@ -19,7 +21,10 @@ export async function tryAcquireIndexerLock(lockId: number = INDEXER_ADVISORY_LO
     if (locked) {
       logger.info({ lockId }, "acquired indexer advisory lock");
     } else {
-      logger.warn({ lockId }, "failed to acquire indexer advisory lock; another instance is running");
+      logger.warn(
+        { lockId },
+        "failed to acquire indexer advisory lock; another instance is running",
+      );
     }
     return locked;
   } catch (err) {
@@ -31,7 +36,9 @@ export async function tryAcquireIndexerLock(lockId: number = INDEXER_ADVISORY_LO
 /**
  * Releases the advisory lock.
  */
-export async function releaseIndexerLock(lockId: number = INDEXER_ADVISORY_LOCK_ID): Promise<boolean> {
+export async function releaseIndexerLock(
+  lockId: number = INDEXER_ADVISORY_LOCK_ID,
+): Promise<boolean> {
   try {
     const result = await prisma.$queryRaw<[{ unlocked: boolean }]>`
       SELECT pg_advisory_unlock(${lockId}) as unlocked;

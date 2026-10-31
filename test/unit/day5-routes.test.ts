@@ -3,14 +3,8 @@ import type { FastifyInstance } from "fastify";
 import { signToken } from "../../src/lib/jwt";
 import { config } from "../../src/config";
 import { prisma } from "../../src/lib/db";
-import {
-  computeMetadataHash,
-  checkContentHashMatch,
-} from "../../src/modules/requests/routes";
-import {
-  sniffImageMagicBytes,
-  computeDeterministicCidV1,
-} from "../../src/modules/uploads/routes";
+import { computeMetadataHash, checkContentHashMatch } from "../../src/modules/requests/routes";
+import { sniffImageMagicBytes, computeDeterministicCidV1 } from "../../src/modules/uploads/routes";
 
 interface MockRequestRow {
   id: bigint;
@@ -277,7 +271,9 @@ describe("Day 5 API routes: requests, giveaways, uploads, search, and moderation
       return reportsStore.find((r) => r.id === args.where.id) ?? null;
     }) as never);
 
-    vi.spyOn(prisma, "$transaction").mockImplementation((async (fn: (tx: unknown) => Promise<unknown>) => {
+    vi.spyOn(prisma, "$transaction").mockImplementation((async (
+      fn: (tx: unknown) => Promise<unknown>,
+    ) => {
       const txClient = {
         post: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         comment: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -343,7 +339,10 @@ describe("Day 5 API routes: requests, giveaways, uploads, search, and moderation
       method: "GET",
       url: "/requests?limit=1",
     });
-    const page1Body = page1.json() as { requests: Array<{ id: string }>; nextCursor: string | null };
+    const page1Body = page1.json() as {
+      requests: Array<{ id: string }>;
+      nextCursor: string | null;
+    };
     expect(page1Body.requests).toHaveLength(1);
     expect(page1Body.requests[0]?.id).toBe("2");
     expect(page1Body.nextCursor).toBe("2");
@@ -352,7 +351,10 @@ describe("Day 5 API routes: requests, giveaways, uploads, search, and moderation
       method: "GET",
       url: `/requests?limit=1&cursor=${page1Body.nextCursor}`,
     });
-    const page2Body = page2.json() as { requests: Array<{ id: string }>; nextCursor: string | null };
+    const page2Body = page2.json() as {
+      requests: Array<{ id: string }>;
+      nextCursor: string | null;
+    };
     expect(page2Body.requests).toHaveLength(1);
     expect(page2Body.requests[0]?.id).toBe("1");
     expect(page2Body.nextCursor).toBeNull();

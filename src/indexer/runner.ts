@@ -5,33 +5,57 @@ import { tryAcquireIndexerLock, releaseIndexerLock } from "./lock";
 import { getStreamCursor, updateStreamCursor } from "./cursor";
 import { fetchSorobanEvents } from "./soroban";
 import { fetchHorizonClaimableBalances } from "./horizon";
-import { handleHelpRequestEvent } from "./handlers/help-request";
-import { handleGiveawayRecord } from "./handlers/giveaway";
-import {
-  recordProcessedEvents,
-  updateLatestLedger,
-  updateLastIndexedLedger,
-} from "./metrics";
+import { dispatchSorobanEvent, handleGiveawayRecord } from "./handlers";
+import { recordProcessedEvents, updateLatestLedger, updateLastIndexedLedger } from "./metrics";
 import { NETWORK_DEFAULTS, decodeEvent } from "@stellar-aid/sdk";
 
-const SOROBAN_STREAM = "soroban:help_request";
+export interface SorobanStreamDefinition {
+  stream: string;
+  contractKey: "help_request" | "reputation" | "attestation";
+  fallbackContractId: string;
+}
+
+export const SOROBAN_STREAMS: readonly SorobanStreamDefinition[] = [
+  {
+    stream: "soroban:help_request",
+    contractKey: "help_request",
+    fallbackContractId: "CBPW3FPPKPT4YWT7NSWM2EZ5AMONGQQQBPAEYZBSBWSOUGY5B26A7RLL",
+  },
+  {
+    stream: "soroban:reputation",
+    contractKey: "reputation",
+    fallbackContractId: "CC46Y6JBSNNTHPZZCLLUILMWMSNLRC3MV46UQ2REQX3N4WI6PTDPOZ2C",
+  },
+  {
+    stream: "soroban:attestation",
+    contractKey: "attestation",
+    fallbackContractId: "CBGSEMRF6DKWPGYGFJBQG5UEUBGFDHEJQUB5EOYTS4C746J54AYAS7GN",
+  },
+];
+
 const HORIZON_STREAM = "horizon:giveaways";
 
 let isRunning = false;
 let hasLock = false;
 let pollTimer: NodeJS.Timeout | null = null;
 
+export function getContractIdForKey(
+  key: "help_request" | "reputation" | "attestation",
+  fallback: string,
+): string {
+  const networkDefaults = NETWORK_DEFAULTS[config.stellarNetwork as keyof typeof NETWORK_DEFAULTS];
+  return networkDefaults?.contracts?.[key] || fallback;
+}
+
 export function getHelpRequestContractId(): string {
-  const networkDefaults =
-    NETWORK_DEFAULTS[config.stellarNetwork as keyof typeof NETWORK_DEFAULTS];
-  return (
-    networkDefaults?.contracts?.help_request ||
-    "CBPW3FPPKPT4YWT7NSWM2EZ5AMONGQQQBPAEYZBSBWSOUGY5B26A7RLL"
+  return getContractIdForKey(
+    "help_request",
+    "CBPW3FPPKPT4YWT7NSWM2EZ5AMONGQQQBPAEYZBSBWSOUGY5B26A7RLL",
   );
 }
 
 /**
- * Executes a single indexing iteration across Soroban RPC and Horizon streams.
+ * Executes a single indexing iteration across Soroban RPC contract streams and Horizon.
  * Atomic transaction per event/record guarantees cursor persistence and idempotency.
  */
 export async function pollOnce(): Promise<{
@@ -41,77 +65,70 @@ export async function pollOnce(): Promise<{
   let sorobanEventsCount = 0;
   let horizonRecordsCount = 0;
 
-  // 1. Process Soroban RPC events for Help Request contract
-  try {
-    const contractId = getHelpRequestContractId();
-    const cursor = await getStreamCursor(SOROBAN_STREAM);
-    const startLedger =
-      cursor.lastLedger > 0
-        ? cursor.lastLedger + 1
-        : config.indexerStartLedger || 1;
+  // 1. Process Soroban RPC events for HelpRequest, Reputation, and Attestation contracts
+  for (const def of SOROBAN_STREAMS) {
+    try {
+      const contractId = getContractIdForKey(def.contractKey, def.fallbackContractId);
+      const cursor = await getStreamCursor(def.stream);
+      const startLedger =
+        cursor.lastLedger > 0 ? cursor.lastLedger + 1 : config.indexerStartLedger || 1;
 
-    const result = await fetchSorobanEvents(contractId, startLedger);
-    updateLatestLedger(result.latestLedger);
+      const result = await fetchSorobanEvents(contractId, startLedger);
+      updateLatestLedger(result.latestLedger);
 
-    for (const raw of result.events) {
-      await prisma.$transaction(async (tx) => {
-        const existing = await tx.processedEvent.findUnique({
-          where: { eventId: raw.id },
-        });
-
-        if (!existing) {
-          await tx.processedEvent.create({
-            data: {
-              eventId: raw.id,
-              ledger: BigInt(raw.ledger),
-            },
+      for (const raw of result.events) {
+        await prisma.$transaction(async (tx) => {
+          const existing = await tx.processedEvent.findUnique({
+            where: { eventId: raw.id },
           });
 
-          try {
-            const decoded = decodeEvent({
-              topic: raw.topic,
-              value: raw.value,
-              contractId: raw.contractId,
-              ledger: raw.ledger,
+          if (!existing) {
+            await tx.processedEvent.create({
+              data: {
+                eventId: raw.id,
+                ledger: BigInt(raw.ledger),
+              },
             });
-            await handleHelpRequestEvent(decoded, tx, {
-              eventId: raw.id,
-              ledger: raw.ledger,
-            });
-          } catch (decErr) {
-            logger.warn(
-              { err: decErr, eventId: raw.id },
-              "failed to decode or handle Soroban event; recording as processed",
-            );
+
+            try {
+              const decoded = decodeEvent({
+                topic: raw.topic,
+                value: raw.value,
+                contractId: raw.contractId,
+                ledger: raw.ledger,
+              });
+              await dispatchSorobanEvent(decoded, tx, {
+                eventId: raw.id,
+                ledger: raw.ledger,
+              });
+            } catch (decErr) {
+              logger.warn(
+                { err: decErr, eventId: raw.id, stream: def.stream },
+                "failed to decode or handle Soroban event; recording as processed",
+              );
+            }
+
+            recordProcessedEvents(1);
+            updateLastIndexedLedger(raw.ledger);
           }
 
-          recordProcessedEvents(1);
-          updateLastIndexedLedger(raw.ledger);
-        }
+          await updateStreamCursor(def.stream, raw.ledger, raw.id, tx);
+        });
+        sorobanEventsCount++;
+      }
 
-        await updateStreamCursor(SOROBAN_STREAM, raw.ledger, raw.id, tx);
-      });
-      sorobanEventsCount++;
+      if (result.events.length === 0 && result.latestLedger > cursor.lastLedger) {
+        await updateStreamCursor(def.stream, result.latestLedger, cursor.lastCursor);
+      }
+    } catch (err) {
+      logger.error({ err, stream: def.stream }, "error during Soroban poll iteration");
     }
-
-    if (result.events.length === 0 && result.latestLedger > cursor.lastLedger) {
-      // Advance cursor to latest ledger if no events were returned
-      await updateStreamCursor(
-        SOROBAN_STREAM,
-        result.latestLedger,
-        cursor.lastCursor,
-      );
-    }
-  } catch (err) {
-    logger.error({ err }, "error during Soroban poll iteration");
   }
 
   // 2. Process Horizon Claimable Balances for Giveaways
   try {
     const cursor = await getStreamCursor(HORIZON_STREAM);
-    const result = await fetchHorizonClaimableBalances(
-      cursor.lastCursor ?? undefined,
-    );
+    const result = await fetchHorizonClaimableBalances(cursor.lastCursor ?? undefined);
 
     for (const record of result.records) {
       const eventId = `giveaway_${record.id}`;
@@ -155,7 +172,6 @@ export async function startIndexer(): Promise<void> {
     return;
   }
 
-  // Acquire exclusive advisory lock so only one indexer instance processes events.
   hasLock = await tryAcquireIndexerLock();
   if (!hasLock) {
     logger.warn("exiting indexer startup: lock held by another process");
@@ -173,10 +189,8 @@ export async function startIndexer(): Promise<void> {
     "indexer worker started with advisory lock",
   );
 
-  // Initial poll run
   void pollOnce();
 
-  // Scheduled poll loop
   pollTimer = setInterval(() => {
     if (isRunning) {
       void pollOnce();

@@ -7,10 +7,14 @@ const options: LoggerOptions = {
   redact: {
     paths: [
       "req.headers.authorization",
+      "req.headers.cookie",
+      'req.headers["x-internal-token"]',
       "SEP10_SIGNING_SECRET",
       "JWT_SECRET",
+      "IPFS_PINNING_JWT",
       "*.sep10SigningSecret",
       "*.jwtSecret",
+      "*.ipfsPinningJwt",
     ],
     remove: true,
   },

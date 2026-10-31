@@ -13,7 +13,11 @@ export async function resetStream(streamName: string): Promise<void> {
     targetStreams = ["soroban:help_request", "horizon:giveaways"];
   } else if (streamName === "help_request" || streamName === "soroban:help_request") {
     targetStreams = ["soroban:help_request"];
-  } else if (streamName === "giveaway" || streamName === "giveaways" || streamName === "horizon:giveaways") {
+  } else if (
+    streamName === "giveaway" ||
+    streamName === "giveaways" ||
+    streamName === "horizon:giveaways"
+  ) {
     targetStreams = ["horizon:giveaways"];
   } else {
     targetStreams = [streamName];

@@ -15,3 +15,30 @@ jobs:
 
   test:
     uses: StellarAid-network/.github/.github/workflows/test-node.yml@main
+
+  openapi-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: api
+      - name: Checkout @stellar-aid/sdk
+        uses: actions/checkout@v4
+        with:
+          repository: stellar-aid/sdk
+          path: sdk
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: api/pnpm-lock.yaml
+      - name: Build SDK and verify committed OpenAPI spec is up to date
+        run: |
+          pnpm --dir sdk install --frozen-lockfile
+          pnpm --dir sdk build
+          pnpm --dir api install --frozen-lockfile
+          pnpm --dir api openapi:export
+          git -C api diff --exit-code openapi/openapi.json

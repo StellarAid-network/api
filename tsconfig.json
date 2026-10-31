@@ -19,6 +19,10 @@
     "declaration": false,
     "outDir": "dist",
     "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@stellar-aid/sdk/*": ["./node_modules/@stellar-aid/sdk/dist/*.d.ts"]
+    },
     "noEmit": true
   },
   "include": ["src", "test", "scripts", "prisma", "vitest.config.ts"],

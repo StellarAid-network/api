@@ -52,9 +52,7 @@ describe("Content and social validation utilities", () => {
   it("escapes unsafe HTML characters on output", () => {
     const input = `<script>alert("XSS & attack")</script>`;
     const escaped = escapeHtml(input);
-    expect(escaped).toBe(
-      "&lt;script&gt;alert(&quot;XSS &amp; attack&quot;)&lt;/script&gt;",
-    );
+    expect(escaped).toBe("&lt;script&gt;alert(&quot;XSS &amp; attack&quot;)&lt;/script&gt;");
   });
 
   it("enforces account age rules", () => {

@@ -12,6 +12,7 @@ import { requireAuth } from "../../plugins/auth";
 import { CommentBodySchema, isAccountOldEnough } from "../../lib/content";
 import { socialWriteRateLimit } from "../../plugins/rate-limit";
 import { config } from "../../config";
+import { enqueueNotification } from "../../jobs/notifications";
 
 const CreateCommentSchema = z.object({
   body: CommentBodySchema,
@@ -181,7 +182,10 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
       const user = request.user;
 
       const existingUser = await prisma.user.findUnique({ where: { address: user.address } });
-      if (existingUser && !isAccountOldEnough(existingUser.createdAt, config.minAccountAgeSeconds)) {
+      if (
+        existingUser &&
+        !isAccountOldEnough(existingUser.createdAt, config.minAccountAgeSeconds)
+      ) {
         return reply.code(403).send({
           type: "https://stellaraid.app/errors/forbidden",
           title: "Forbidden",
@@ -226,6 +230,16 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
           status: "VISIBLE",
         },
       });
+
+      if (post.author !== user.address) {
+        await enqueueNotification({
+          recipient: post.author,
+          kind: "comment_on_post",
+          title: "New comment on your post",
+          body: `${user.address.slice(0, 6)}... commented on your post.`,
+          refId: post.id,
+        });
+      }
 
       return reply.code(201).send({
         id: comment.id,

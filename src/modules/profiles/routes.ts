@@ -10,6 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../../lib/db";
 import { requireAuth } from "../../plugins/auth";
+import { deriveBadgesForScore } from "../../indexer/handlers/reputation";
 
 // ── Zod schemas ────────────────────────────────────────────────────────────
 
@@ -34,6 +35,19 @@ async function buildProfileResponse(address: string) {
     prisma.follow.count({ where: { followerAddress: address } }),
   ]);
 
+  let reputationScore = 0;
+  try {
+    const latestRep = await prisma.reputationEvent?.findFirst?.({
+      where: { subject: address },
+      orderBy: [{ ledger: "desc" }, { createdAt: "desc" }],
+    });
+    if (latestRep && typeof latestRep.newScore === "number") {
+      reputationScore = latestRep.newScore;
+    }
+  } catch {
+    reputationScore = 0;
+  }
+
   return {
     address,
     displayName: user?.displayName ?? null,
@@ -41,6 +55,8 @@ async function buildProfileResponse(address: string) {
     avatarHash: user?.avatarHash ?? null,
     followerCount,
     followingCount,
+    reputationScore,
+    badges: deriveBadgesForScore(reputationScore),
     createdAt: user?.createdAt?.toISOString() ?? null,
   };
 }
@@ -48,7 +64,6 @@ async function buildProfileResponse(address: string) {
 // ── Routes ─────────────────────────────────────────────────────────────────
 
 export async function profileRoutes(app: FastifyInstance): Promise<void> {
-
   // GET /profiles/:address
   app.get(
     "/profiles/:address",
@@ -71,6 +86,18 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
               avatarHash: { type: ["string", "null"] },
               followerCount: { type: "number" },
               followingCount: { type: "number" },
+              reputationScore: { type: "integer" },
+              badges: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    tier: { type: "integer" },
+                    threshold: { type: "integer" },
+                  },
+                },
+              },
               createdAt: { type: ["string", "null"] },
             },
           },

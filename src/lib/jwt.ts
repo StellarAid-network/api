@@ -10,11 +10,7 @@ export interface SessionPayload {
   exp?: number;
 }
 
-export function signToken(
-  address: string,
-  secret: string,
-  expiresIn: string,
-): string {
+export function signToken(address: string, secret: string, expiresIn: string): string {
   return jwt.sign({ sub: address }, secret, { expiresIn } as jwt.SignOptions);
 }
 

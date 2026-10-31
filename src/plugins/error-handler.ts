@@ -2,6 +2,7 @@ import type { FastifyError, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { ZodError } from "zod";
 import { sendProblem } from "../lib/problem";
+import { captureException, initSentry } from "../lib/sentry";
 
 function statusOf(error: FastifyError): number {
   if (typeof error.statusCode === "number") {
@@ -12,14 +13,22 @@ function statusOf(error: FastifyError): number {
 
 export const errorHandlerPlugin = fp(
   async (app) => {
+    initSentry();
+
     app.setErrorHandler((error: FastifyError, request: FastifyRequest, reply) => {
       const status = statusOf(error);
       const isServerError = status >= 500;
 
       if (isServerError) {
-        request.log.error({ err: error }, "unhandled request error");
+        request.log.error({ err: error, reqId: request.id }, "unhandled request error");
+        captureException(error, {
+          requestId: request.id,
+          method: request.method,
+          url: request.url,
+          userAddress: request.user?.address ?? null,
+        });
       } else {
-        request.log.warn({ err: error }, "request rejected");
+        request.log.warn({ err: error, reqId: request.id }, "request rejected");
       }
 
       if (error instanceof ZodError) {

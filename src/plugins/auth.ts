@@ -53,7 +53,10 @@ export const authFastifyPlugin = fp(authPlugin, {
  * Assert that the request is authenticated; throws 401 otherwise.
  * Call at the start of any route handler that requires a signed-in user.
  */
-export function requireAuth(request: FastifyRequest, reply: FastifyReply): asserts request is FastifyRequest & { user: RequestUser } {
+export function requireAuth(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): asserts request is FastifyRequest & { user: RequestUser } {
   if (!request.user) {
     void reply.code(401).send({
       type: "https://stellaraid.app/errors/unauthorized",

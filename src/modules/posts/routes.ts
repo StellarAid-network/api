@@ -65,7 +65,10 @@ export async function postRoutes(app: FastifyInstance): Promise<void> {
       const user = request.user;
 
       const existingUser = await prisma.user.findUnique({ where: { address: user.address } });
-      if (existingUser && !isAccountOldEnough(existingUser.createdAt, config.minAccountAgeSeconds)) {
+      if (
+        existingUser &&
+        !isAccountOldEnough(existingUser.createdAt, config.minAccountAgeSeconds)
+      ) {
         return reply.code(403).send({
           type: "https://stellaraid.app/errors/forbidden",
           title: "Forbidden",

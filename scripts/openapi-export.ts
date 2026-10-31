@@ -3,12 +3,16 @@ import { dirname, resolve } from "node:path";
 import { Keypair } from "@stellar/stellar-sdk";
 
 process.env["NODE_ENV"] ??= "test";
-process.env["DATABASE_URL"] ??= "postgresql://stellaraid:stellaraid@localhost:5432/stellaraid?schema=public";
+process.env["DATABASE_URL"] ??=
+  "postgresql://stellaraid:stellaraid@localhost:5432/stellaraid?schema=public";
 process.env["REDIS_URL"] ??= "redis://localhost:6379";
 process.env["STELLAR_NETWORK"] ??= "testnet";
 process.env["SOROBAN_RPC_URL"] ??= "https://soroban-testnet.stellar.org";
 process.env["HORIZON_URL"] ??= "https://horizon-testnet.stellar.org";
-if (!process.env["SEP10_SIGNING_SECRET"] || process.env["SEP10_SIGNING_SECRET"].startsWith("SDUMMY")) {
+if (
+  !process.env["SEP10_SIGNING_SECRET"] ||
+  process.env["SEP10_SIGNING_SECRET"].startsWith("SDUMMY")
+) {
   process.env["SEP10_SIGNING_SECRET"] = Keypair.random().secret();
 }
 process.env["SEP10_HOME_DOMAIN"] ??= "localhost:3000";

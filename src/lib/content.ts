@@ -13,8 +13,7 @@ import { z } from "zod";
  * Regex for IPFS CIDv0 (base58 starting with Qm, 46 chars) and
  * CIDv1 (base32 starting with 'bafy', 'ba', etc.).
  */
-export const IPFS_CID_REGEX =
-  /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z0-9]{55,}|ba[a-z2-7]{57,})$/;
+export const IPFS_CID_REGEX = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z0-9]{55,}|ba[a-z2-7]{57,})$/;
 
 export function isValidIpfsCid(cid: string): boolean {
   return IPFS_CID_REGEX.test(cid);
@@ -54,7 +53,10 @@ export function escapeHtml(str: string): string {
 /**
  * Validates that an account meets the minimum age requirement before creating social content.
  */
-export function isAccountOldEnough(createdAt: Date | undefined | null, minAgeSeconds: number): boolean {
+export function isAccountOldEnough(
+  createdAt: Date | undefined | null,
+  minAgeSeconds: number,
+): boolean {
   if (minAgeSeconds <= 0) return true;
   if (!createdAt) return false;
   const ageSeconds = (Date.now() - createdAt.getTime()) / 1000;

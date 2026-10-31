@@ -235,6 +235,21 @@ model Attestation {
   @@index([subject])
 }
 
+/// In-app notification record written by the BullMQ notifications worker.
+model Notification {
+  id        String   @id @default(cuid())
+  recipient String
+  kind      String
+  title     String
+  body      String
+  refId     String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([recipient, createdAt])
+  @@index([recipient, read])
+}
+
 /// Per-stream indexer cursor.
 model IndexerCursor {
   stream     String   @id

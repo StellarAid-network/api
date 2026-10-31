@@ -79,8 +79,5 @@ export async function handleGiveawayClaim(
     data: { status: "claimed" },
   });
 
-  logger.info(
-    { balanceId: claim.balanceId, claimer: claim.claimer },
-    "indexed giveaway claim",
-  );
+  logger.info({ balanceId: claim.balanceId, claimer: claim.claimer }, "indexed giveaway claim");
 }

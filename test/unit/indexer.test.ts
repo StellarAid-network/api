@@ -165,9 +165,17 @@ describe("Indexer Event Handlers & Replay Safety", () => {
     }
 
     const statePass1 = {
-      request: JSON.parse(JSON.stringify(db.helpRequests.get("42"), (_, v) => typeof v === "bigint" ? v.toString() : v)),
+      request: JSON.parse(
+        JSON.stringify(db.helpRequests.get("42"), (_, v) =>
+          typeof v === "bigint" ? v.toString() : v,
+        ),
+      ),
       contributionsCount: db.contributions.size,
-      milestone: JSON.parse(JSON.stringify(db.milestones.get("42_0"), (_, v) => typeof v === "bigint" ? v.toString() : v)),
+      milestone: JSON.parse(
+        JSON.stringify(db.milestones.get("42_0"), (_, v) =>
+          typeof v === "bigint" ? v.toString() : v,
+        ),
+      ),
     };
 
     expect(statePass1.request.status).toBe("releasing");
@@ -182,9 +190,17 @@ describe("Indexer Event Handlers & Replay Safety", () => {
     }
 
     const statePass2 = {
-      request: JSON.parse(JSON.stringify(db.helpRequests.get("42"), (_, v) => typeof v === "bigint" ? v.toString() : v)),
+      request: JSON.parse(
+        JSON.stringify(db.helpRequests.get("42"), (_, v) =>
+          typeof v === "bigint" ? v.toString() : v,
+        ),
+      ),
       contributionsCount: db.contributions.size,
-      milestone: JSON.parse(JSON.stringify(db.milestones.get("42_0"), (_, v) => typeof v === "bigint" ? v.toString() : v)),
+      milestone: JSON.parse(
+        JSON.stringify(db.milestones.get("42_0"), (_, v) =>
+          typeof v === "bigint" ? v.toString() : v,
+        ),
+      ),
     };
 
     // Assert identical DB state after replay
@@ -234,9 +250,7 @@ describe("Indexer Event Handlers & Replay Safety", () => {
       sponsor: "GCSPONSOR",
       last_modified_ledger: 500,
       last_modified_time: "2026-10-27T12:00:00Z",
-      claimants: [
-        { destination: "GBCLAIMER1", predicate: { unconditional: true } },
-      ],
+      claimants: [{ destination: "GBCLAIMER1", predicate: { unconditional: true } }],
       paging_token: "500-1",
     };
 

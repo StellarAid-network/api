@@ -21,6 +21,8 @@ import { uploadRoutes } from "./modules/uploads/routes";
 import { searchRoutes } from "./modules/search/routes";
 import { reportRoutes } from "./modules/reports/routes";
 import { moderationRoutes } from "./modules/moderation/routes";
+import { reputationRoutes } from "./modules/reputation/routes";
+import { notificationRoutes } from "./modules/notifications/routes";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -57,6 +59,8 @@ export async function buildApp(): Promise<FastifyInstance> {
       await searchRoutes(sub);
       await reportRoutes(sub);
       await moderationRoutes(sub);
+      await reputationRoutes(sub);
+      await notificationRoutes(sub);
     },
     { prefix: "/" },
   );
